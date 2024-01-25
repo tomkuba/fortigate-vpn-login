@@ -10,6 +10,7 @@ import os
 import sys
 import webbrowser
 import subprocess
+from urllib.parse import urlsplit
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from fortigate_vpn_login import __version__, __description__, logger
 from fortigate_vpn_login import utils, config
@@ -150,6 +151,23 @@ def main() -> int:
 
     cookie_svpn = fortigate.get_cookie(auth_id)
 
+    PASSWD_FILE = os.path.expanduser("~/.fortigate-vpn-cookie")
+
+    with open(PASSWD_FILE, 'w') as f:
+        f.write(f"vpn.secrets.cookie:SVPNCOOKIE={cookie_svpn}\n")
+        # TODO: handle hardcoded cert fingerprint
+        f.write("vpn.secrets.gwcert:pin-sha256:Bvu5MoDJrSYEHTPLNGc2RgR1Ub4/f9p0kE7utQ8v9EE=\n")
+        f.write(f"vpn.secrets.gateway:{fortigate_vpn_url}\n")
+
+    nmcli_command = [
+        f"/usr/bin/nmcli",
+        "con",
+        "up",
+        f"{urlsplit(fortigate_vpn_url).netloc}",
+        "passwd-file",
+        f"{PASSWD_FILE}",
+    ]
+
     openconnect_arguments = [
         "--protocol=fortinet",
         f"--server={fortigate_vpn_url}",
@@ -182,8 +200,11 @@ def main() -> int:
         ]
     else:
         if not os.getuid() == 0:
-            command_line.append("sudo")
-            command_line = command_line + [str(openconnect_path)] + openconnect_arguments
+            # TODO: make option to use nmcli or openconnect
+            #command_line.append("sudo")
+            #command_line = command_line + [str(openconnect_path)] + openconnect_arguments
+            command_line = nmcli_command
+            print(command_line)
 
     env = os.environ.copy()
     env['LC_ALL'] = 'C'
