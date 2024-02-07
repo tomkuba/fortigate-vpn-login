@@ -157,7 +157,8 @@ def main() -> int:
         f.write(f"vpn.secrets.cookie:SVPNCOOKIE={cookie_svpn}\n")
         # TODO: handle hardcoded cert fingerprint
         f.write("vpn.secrets.gwcert:pin-sha256:Bvu5MoDJrSYEHTPLNGc2RgR1Ub4/f9p0kE7utQ8v9EE=\n")
-        f.write(f"vpn.secrets.gateway:{fortigate_vpn_url}\n")
+        f.write(f"vpn.secrets.gateway:{urlsplit(fortigate_vpn_url).netloc}\n")
+        f.write("vpn.secrets.resolve:vpn2.xitee.com:80.190.69.97")
 
     nmcli_command = [
         f"/usr/bin/nmcli",
