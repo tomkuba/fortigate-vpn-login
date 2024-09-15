@@ -156,7 +156,8 @@ def main() -> int:
     with open(PASSWD_FILE, 'w') as f:
         f.write(f"vpn.secrets.cookie:SVPNCOOKIE={cookie_svpn}\n")
         # TODO: handle hardcoded cert fingerprint
-        f.write("vpn.secrets.gwcert:pin-sha256:Bvu5MoDJrSYEHTPLNGc2RgR1Ub4/f9p0kE7utQ8v9EE=\n")
+        # echo | openssl s_client -connect vpn2.xitee.com:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+        f.write("vpn.secrets.gwcert:pin-sha256:zbpix2/2KQ+ge/9c0IxjLhhggjNQWLQWbTuCQ3cy/hE=\n")
         f.write(f"vpn.secrets.gateway:{urlsplit(fortigate_vpn_url).netloc}\n")
         f.write("vpn.secrets.resolve:\n")
 
