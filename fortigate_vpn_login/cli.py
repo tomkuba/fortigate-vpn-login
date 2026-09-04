@@ -151,14 +151,20 @@ def main() -> int:
 
     cookie_svpn = fortigate.get_cookie(auth_id)
 
+    # pin the gateway certificate presented right now instead of a hardcoded fingerprint that
+    # breaks on every certificate renewal
+    gateway = urlsplit(fortigate_vpn_url)
+    gwcert = utils.get_gateway_cert_hash(gateway.hostname, gateway.port or 443)
+    if not gwcert:
+        print(f"ERROR: Could not retrieve the certificate from {gateway.netloc}.")
+        return 1
+
     PASSWD_FILE = os.path.expanduser("~/.fortigate-vpn-cookie")
 
     with open(PASSWD_FILE, 'w') as f:
         f.write(f"vpn.secrets.cookie:SVPNCOOKIE={cookie_svpn}\n")
-        # TODO: handle hardcoded cert fingerprint
-        # echo | openssl s_client -connect vpn2.xitee.com:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
-        f.write("vpn.secrets.gwcert:pin-sha256:6M/QEkhI1ayxPVbNDI3PZD4ooJ4Kwa/g1Iac27FKI4c=\n")
-        f.write(f"vpn.secrets.gateway:{urlsplit(fortigate_vpn_url).netloc}\n")
+        f.write(f"vpn.secrets.gwcert:{gwcert}\n")
+        f.write(f"vpn.secrets.gateway:{gateway.netloc}\n")
         f.write("vpn.secrets.resolve:\n")
 
     nmcli_command = [

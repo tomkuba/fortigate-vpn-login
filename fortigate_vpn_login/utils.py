@@ -6,13 +6,19 @@
     Helper methods for fortigate_vpn_login
 """
 import os
+import base64
+import hashlib
 import psutil
+import socket
+import ssl
 import subprocess
 import re
 from typing import Optional
 from shutil import which
 from pathlib import Path
 from enum import Enum, auto
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 from fortigate_vpn_login import logger
 
 
@@ -114,6 +120,50 @@ def get_openconnect_pid(pid_file: str) -> int:
         pid = None
 
     return pid
+
+
+def get_gateway_cert_hash(host: str, port: int = 443) -> Optional[str]:
+    """
+    Fetches the TLS certificate presented by the VPN gateway and returns its public-key
+    fingerprint in the `pin-sha256:` form understood by `openconnect --servercert` (and
+    NetworkManager's `vpn.secrets.gwcert`).
+
+    Computing this at runtime avoids shipping a hardcoded pin that breaks whenever the gateway
+    certificate is renewed.
+
+    Args:
+        host (str): The gateway hostname.
+        port (int): The gateway TLS port. Defaults to 443.
+
+    Returns:
+        str|Optional: `pin-sha256:<base64>` digest of the certificate's SubjectPublicKeyInfo,
+        or None on failure.
+    """
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    # we only want to read the presented certificate, not validate the chain
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+
+    try:
+        with socket.create_connection((host, port), timeout=10) as sock:
+            with context.wrap_socket(sock, server_hostname=host) as ssock:
+                der_cert = ssock.getpeercert(binary_form=True)
+    except OSError as e:
+        logger.debug(f"Could not fetch gateway certificate from {host}:{port}: {e}")
+        return None
+
+    if not der_cert:
+        logger.debug(f"No certificate returned by {host}:{port}")
+        return None
+
+    spki = x509.load_der_x509_certificate(der_cert).public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    pin = base64.b64encode(hashlib.sha256(spki).digest()).decode("ascii")
+    cert_hash = f"pin-sha256:{pin}"
+    logger.debug(f"Gateway certificate hash for {host}:{port}: {cert_hash}")
+    return cert_hash
 
 
 def check_openconnect_version(openconnect_path: Path) -> bool:
